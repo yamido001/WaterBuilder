@@ -11,6 +11,50 @@ public class WaterShore
 	/// 在List中的前后两条线段依次相连
 	/// </summary>
 	private List<WaterShoreSegment> mWaterShoreSegmentList = new List<WaterShoreSegment> ();
+	private List<Vector3> mWaterShorePointList;
+	private float mWaterHeight;
+	private static int IdIndex = 0;
+
+	public WaterShore(float waterHeight)
+	{
+		mWaterHeight = waterHeight;
+		ID = ++IdIndex;
+	}
+
+	public int ID {
+		get;
+		private set;
+	}
+
+	public bool IsInvalidShore {
+		get;
+		private set;
+	}
+
+	public Vector4 EdgePos
+	{
+		get {
+			float xMin = float.MaxValue;
+			float yMin = float.MaxValue;
+			float xMax = float.MinValue;
+			float yMax = float.MinValue;
+			for (int i = 0; i < mWaterShoreSegmentList.Count; ++i) {
+				WaterShoreSegment segement = mWaterShoreSegmentList [i];
+				xMin = Utils.GetMinValue (xMin, segement.posOne.x, segement.posTwo.x);
+				xMax = Utils.GetMaxValue (xMin, segement.posOne.x, segement.posTwo.x);
+				yMin = Utils.GetMinValue (yMin, segement.posOne.y, segement.posTwo.y);
+				yMax = Utils.GetMaxValue (yMax, segement.posOne.y, segement.posTwo.y);
+			}
+			return new Vector4 (xMin, xMax, yMin, yMax);
+		}
+	}
+
+	public float EdgeSize
+	{
+		get{
+			return Mathf.Sqrt ((EdgePos.y - EdgePos.x) * (EdgePos.y - EdgePos.x) + (EdgePos.w - EdgePos.z) * (EdgePos.w - EdgePos.z));
+		}
+	}
 
 	/// <summary>
 	/// 把传入的线放入现有的链表中
@@ -121,6 +165,32 @@ public class WaterShore
 	}
 
 	/// <summary>
+	/// 获取所有水岸线的点
+	/// </summary>
+	/// <returns>The all shore point.</returns>
+	public List<Vector3> GetAllShorePoint()
+	{
+		if (null == mWaterShorePointList) {
+			mWaterShorePointList = new List<Vector3> ();
+			for (int i = 0; i < mWaterShoreSegmentList.Count; ++i) {
+				WaterShoreSegment shoreSegment = mWaterShoreSegmentList [i];
+				if (mWaterShorePointList.Count == 0) {
+					mWaterShorePointList.Add (shoreSegment.posOne);
+					mWaterShorePointList.Add (shoreSegment.posTwo);
+				} else {
+					if (!shoreSegment.IsPointNear (shoreSegment.posOne, mWaterShorePointList [mWaterShorePointList.Count - 1])) {
+						mWaterShorePointList.Add (shoreSegment.posOne);
+					}
+					mWaterShorePointList.Add (shoreSegment.posTwo);
+				}
+			}
+		}
+		if(mWaterShorePointList[0].Equals(mWaterShorePointList[mWaterShorePointList.Count - 1]))
+			mWaterShorePointList.RemoveAt(mWaterShorePointList.Count - 1);	
+		return mWaterShorePointList;
+	}
+
+	/// <summary>
 	/// 倒叙水岸线的相连的线段
 	/// </summary>
 	private void RevertWaterLines()
@@ -168,5 +238,96 @@ public class WaterShore
 				frontSegment.posTwo = curSegment.posTwo;
 			}
 		}
+		GetAllShorePoint ();
+	}
+
+	/// <summary>
+	/// 传入的水岸线是否完全在当前的内部
+	/// </summary>
+	/// <returns><c>true</c> if this instance is water shore inside the specified other; otherwise, <c>false</c>.</returns>
+	/// <param name="other">Other.</param>
+	public bool IsWaterShoreInside(WaterShore other)
+	{
+		List<WaterShoreSegment> otherSegments = other.GetAllWaterShoreSegment ();
+		for (int i = 0; i < otherSegments.Count; ++i) {
+			WaterShoreSegment waterSegment = otherSegments [i];
+			if (!IsPointInSide (waterSegment.posOne)) {
+				return false;
+			}
+			if (!IsPointInSide (waterSegment.posTwo)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/// <summary>
+	/// 水是否在水岸线的内圈
+	/// </summary>
+	/// <value><c>true</c> if this instance is inside water; otherwise, <c>false</c>.</value>
+	public bool IsInsideWater
+	{
+		get{
+			Vector3 onePointInside = GetInsidePoint ();
+//			Debug.LogError (ID.ToString() + "  获取到内部的点  " + onePointInside.x + "  " + onePointInside.z);
+			float terrainHeight = Terrain.activeTerrain.SampleHeight(onePointInside);
+//			Debug.LogError ( "  地形高度" + terrainHeight);
+			return terrainHeight < mWaterHeight;
+		}
+	}
+
+	public bool IsLineIntersection(Vector3 pos1, Vector3 pos2)
+	{
+		for (int i = 0; i < mWaterShorePointList.Count; ++i) {
+			Vector3 curCheckInside = mWaterShorePointList[i];
+			Vector3 nextCheckInside = (i == mWaterShorePointList.Count - 1) ? mWaterShorePointList [0] : mWaterShorePointList [i + 1];
+			if (Utils.IsLineIntersection (pos1, pos2, curCheckInside, nextCheckInside))
+				return true;
+		}
+		return false;
+	}
+
+	/// <summary>
+	/// 获取圈中的任意一点
+	/// </summary>
+	/// <returns>The inside point.</returns>
+	Vector3 GetInsidePoint()
+	{
+		//TODO 并不能保证这个点不是在其他的圈内部
+		System.Text.StringBuilder sbLog = new System.Text.StringBuilder();
+		for (int j = 1; j < 2; ++j) {
+			float offsetDis = j * 0.01f;
+			for (int i = 0; i < mWaterShoreSegmentList.Count; ++i) {
+				WaterShoreSegment waterShore = mWaterShoreSegmentList [i];
+				Vector3 centerPos = (waterShore.posOne + waterShore.posTwo) / 2;
+				Vector3 verticalDir = Vector3.Cross ((waterShore.posOne - centerPos).normalized, Vector3.up).normalized;
+				Vector3 offsetPoint = centerPos + verticalDir * offsetDis;
+				if (IsPointInSide (offsetPoint)) {
+					return offsetPoint;
+				}
+				sbLog.Append (offsetPoint.x + "  " + offsetPoint.z + "\n");
+				offsetPoint = centerPos - verticalDir * offsetDis;
+				if (IsPointInSide (offsetPoint)) {
+					return offsetPoint;
+				}
+				sbLog.Append (offsetPoint.x + "  " + offsetPoint.z + "\n");
+			}
+		}
+		//TODO 这里真的出现过，需要调查
+		IsInvalidShore = true;
+		Debug.LogError ("居然没有找到在圈内的点  " + ID + "\n" + sbLog.ToString() );
+		return Vector3.zero;
+	}
+
+	bool IsPointInSide(Vector3 point)
+	{
+		int intersectionCount = 0;
+		for (int i = 0; i < mWaterShoreSegmentList.Count; ++i) {
+			WaterShoreSegment shoreSegment = mWaterShoreSegmentList [i];
+			if (Utils.IsLineIntersection (point, new Vector3 (100f, mWaterHeight, 100f)
+				, shoreSegment.posOne, shoreSegment.posTwo))
+				intersectionCount++;
+		}
+		return intersectionCount % 2 != 0;
 	}
 }

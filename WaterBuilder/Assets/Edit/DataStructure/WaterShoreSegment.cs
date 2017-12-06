@@ -55,7 +55,7 @@ public class WaterShoreSegment
 	/// <returns><c>true</c> if this instance is point near the specified pos1 pos2; otherwise, <c>false</c>.</returns>
 	/// <param name="pos1">Pos1.</param>
 	/// <param name="pos2">Pos2.</param>
-	private bool IsPointNear(Vector3 pos1, Vector3 pos2)
+	public bool IsPointNear(Vector3 pos1, Vector3 pos2)
 	{
 		return Vector3.Distance (pos1, pos2) < SegmentJoinMinDistant;	
 	}

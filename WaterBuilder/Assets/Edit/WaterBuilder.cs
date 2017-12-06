@@ -13,17 +13,14 @@ public class WaterBuilder : MonoBehaviour {
 	public float waterHeight = 12f;
 	#endregion
 
-	List<WaterShoreSegment> waterShoreSegment = new List<WaterShoreSegment>();
 	List<WaterShore> waterShoreList = new List<WaterShore>();
+	List<Water> waterList = new List<Water>();
 
 	public void BuildWater()
 	{
-		Debug.Log ("BuildWater   " + waterHeight.ToString());
-
 		terrainParse = gameObject.GetComponent<WaterTerrainParse> ();
-		waterShoreSegment.Clear ();
 
-		waterShoreSegment = terrainParse.GenerateWaterShoreSegmentList (waterHeight);
+		List<WaterShoreSegment> waterShoreSegment = terrainParse.GenerateWaterShoreSegmentList (waterHeight);
 		if (waterShoreSegment == null) {
 			Debug.LogError ("GenerateWaterShoreSegment return null");
 			return;
@@ -32,6 +29,22 @@ public class WaterBuilder : MonoBehaviour {
 		waterShoreList = GenerateWaterShoreList (waterShoreSegment);
 
 		CullSmallWaterShoreSegment (waterShoreList, 0.1f);
+
+		waterList = GenerateWaters (waterShoreList);
+
+		for (int i = 0; i < waterList.Count; ++i) {
+			Mesh mesh = waterList [i].CreateMesh (transform.position);
+			if (null == mesh)
+				continue;
+			GameObject child = new GameObject ();
+			child.name = waterList [i].TransName;
+			child.transform.SetParent (this.transform);
+			child.transform.localPosition = Vector3.zero;
+			MeshFilter filter = child.AddComponent<MeshFilter> ();
+			MeshRenderer render = child.AddComponent<MeshRenderer> ();
+			render.material = Resources.Load<Material> ("Material/WaterMaterial" + (i + 1).ToString());
+			filter.mesh = mesh;
+		}
 	}
 
 	private void CullSmallWaterShoreSegment(List<WaterShore> waterShoreList, float cullLength)
@@ -58,7 +71,7 @@ public class WaterBuilder : MonoBehaviour {
 				}
 			}
 			if (!hasFind) {
-				WaterShore waterInfo = new WaterShore ();
+				WaterShore waterInfo = new WaterShore (waterHeight);
 				waterInfo.JoinWaterShoreSegment (waterShoreSegment);
 				waterShoreList.Add (waterInfo);
 			}
@@ -95,6 +108,46 @@ public class WaterBuilder : MonoBehaviour {
 		return waterShoreList;
 	}
 
+	List<Water> GenerateWaters(List<WaterShore> waterShores)
+	{
+		//TODO 现在只是对大小进行了排序
+		waterShores.Sort (delegate(WaterShore x, WaterShore y) {
+			return x.EdgeSize.CompareTo(y.EdgeSize);
+		});
+
+		List<Water> ret = new List<Water> ();
+		Water waitOutSideWater = null;
+		for (int i = 0; i < waterShores.Count; ++i) {
+			WaterShore waterShore = waterShores [i];
+
+			bool isInsideWater = waterShore.IsInsideWater;
+			if (waterShore.IsInvalidShore)
+				continue;
+
+			if (waterShore.IsInsideWater) {
+				//水岸线的内圈是
+				if (null != waitOutSideWater) {
+					waitOutSideWater.SetOutsideShore (waterShore);
+					ret.Add (waitOutSideWater);
+					waitOutSideWater = null;
+				} else {
+					Water water = new Water ();
+					water.SetSingleShore (waterShore);
+					ret.Add (water);
+				}
+			} else {
+				//水岸线外圈是水，需要等待到下一个包含自己并且内圈是水的
+				waitOutSideWater = new Water();
+				waitOutSideWater.SetInsideShore (waterShore);
+			}
+		}
+		if (null != waitOutSideWater) {
+			Debug.LogError ("发现没有匹配成功的");
+			ret.Remove (waitOutSideWater);
+		}
+		Debug.Log ("水的数量 " + ret.Count);
+		return ret;
+	}
 
 	void OnDrawGizmos()
 	{
@@ -104,12 +157,13 @@ public class WaterBuilder : MonoBehaviour {
 		allColors [1] = Color.green;
 		allColors [2] = Color.blue;
 		allColors [3] = Color.black;
-		for (int j = 0; j < waterShoreList.Count; ++j) {
-			WaterShore waterSHore = waterShoreList [j];
-			Gizmos.color = allColors[j % allColors.Length];
-			List<WaterShoreSegment> waterShoreSegments = waterSHore.GetAllWaterShoreSegment ();
-			for (int i = 0; i < waterShoreSegments.Count; ++i) {
-				WaterShoreSegment waterSHoreSegment = waterShoreSegments [i];
+
+		for (int i = 0; i < waterList.Count; ++i) {
+			Water water = waterList [i];
+			Gizmos.color = allColors[i % allColors.Length];
+			List<WaterShoreSegment> waterShoreSegments = water.GetAllWaterShoreSegment ();
+			for (int j = 0; j < waterShoreSegments.Count; ++j) {
+				WaterShoreSegment waterSHoreSegment = waterShoreSegments [j];
 				Vector3 posOne = waterSHoreSegment.posOne;
 				Vector3 posTwo = waterSHoreSegment.posTwo;
 
