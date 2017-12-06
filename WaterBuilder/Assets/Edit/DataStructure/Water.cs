@@ -7,60 +7,13 @@ using UnityEngine;
 /// </summary>
 public class Water{
 
-	public class TriangleObject
-	{
-		public Vector3 pos1;
-		public Vector3 pos2;
-		public Vector3 pos3;
-
-		public TriangleObject(Vector3 pos1, Vector3 pos2, Vector3 pos3)
-		{
-			this.pos1 = pos1;
-			this.pos2 = pos2;
-			this.pos3 = pos3;
-			SortPoints();
-		}
-
-		public bool IsLineIntersect(Vector3 linePos1, Vector3 linePos2)
-		{
-			if (linePos1.Equals (pos1) && linePos2.Equals (pos2))
-				return false;
-			if (linePos1.Equals (pos2) && linePos2.Equals (pos3))
-				return false;
-			if (linePos1.Equals (pos3) && linePos2.Equals (pos1))
-				return false;
-			if (Utils.IsLineIntersection (linePos1, linePos2, pos1, pos2))
-				return true;
-			if (Utils.IsLineIntersection (linePos1, linePos2, pos2, pos3))
-				return true;
-			if (Utils.IsLineIntersection (linePos1, linePos2, pos3, pos1))
-				return true;
-			return false;
-		}
-
-		protected void SortPoints()
-		{
-			Vector3 cross = Vector3.Cross (pos2 - pos1, pos3 - pos2);
-			if (Vector3.Dot (cross, Vector3.up) < 0) {
-				Vector3 temp = pos3;
-				pos3 = pos2;
-				pos2 = temp;
-			}
-		}
-
-		public override string ToString ()
-		{
-			return string.Format ("({0} , {1}, {2}) ({3} , {4}, {5}) ({6} , {7}, {8}) ", pos1.x, pos1.y, pos1.z, pos2.x, pos2.y, pos2.z, pos3.x, pos3.y, pos3.z);
-		}
-	}
-
 	static int WaterCount = 1;
 
 	WaterShore mSingleShore;	//内圈是水
 	WaterShore mInsideShore;	
 	WaterShore mOutsideShore;
 
-	List<TriangleObject> mAllTriangles = new List<TriangleObject> ();
+	List<TriangleShape> mAllTriangles = new List<TriangleShape> ();
 
 	public int ID {
 		get;
@@ -101,8 +54,10 @@ public class Water{
 		if (null != mSingleShore) {
 			return CreateInsideMesh (worldPos);
 		} else if (null != mInsideShore && null != mOutsideShore) {
-			GeneralRingWaterTriangles ();
-			return CreateRingWaterMesh (worldPos);
+//			GeneralRingWaterTriangles ();
+//			return CreateRingWaterMesh (worldPos);
+			return CreateRingWaterMesh();
+//			return null;
 		}
 		Debug.LogError ("生成水的模型失败,水岸线信息不合法");
 		return null;
@@ -132,27 +87,16 @@ public class Water{
 	#region 生成内圈的水
 	Mesh CreateInsideMesh(Vector3 worldPos)
 	{
-		List<WaterShoreSegment> segmentList = mSingleShore.GetAllWaterShoreSegment ();
+		List<Vector3> allPoints = mSingleShore.GetAllShorePoint ();
+		List<TriangleShape> allTriangles = Utils.GenerateTriangles (allPoints);
+		return CreateMeshWithTrianglesList (allTriangles);
+	}
+	#endregion
 
-		Vector3 centerPos = Vector3.zero;
-		float xMin = float.MaxValue;
-		float xMax = float.MinValue;
-		float zMin = float.MaxValue;
-		float zMax = float.MinValue;
-		for (int i = 0; i < segmentList.Count; ++i) {
-			WaterShoreSegment shoreSegment = segmentList [i];
-			Vector3 posOne = shoreSegment.posOne - worldPos;
-			Vector3 posTwo = shoreSegment.posTwo - worldPos;
-			centerPos += posOne;
-			centerPos += posTwo;
-			xMin = Utils.GetMinValue (xMin, posOne.x, posTwo.x);
-			xMax = Utils.GetMaxValue (xMax, posOne.x, posTwo.x);
-			zMin = Utils.GetMinValue (zMin, posOne.z, posTwo.z);
-			zMax = Utils.GetMaxValue (zMax, posOne.z, posTwo.z);
-		}
-		centerPos /= segmentList.Count * 2;
+	Mesh CreateMeshWithTrianglesList(List<TriangleShape> triangleList)
+	{
 		Mesh retMesh = new Mesh ();
-		int trianglesCount = segmentList.Count;
+		int trianglesCount = triangleList.Count;
 		Vector3[] vertices = new Vector3[trianglesCount * 3];
 		Vector2[] uv = new Vector2[trianglesCount * 3];
 		Color[] colors = new Color[trianglesCount * 3];
@@ -160,24 +104,25 @@ public class Water{
 
 		int trianglesIndex = 0;
 		for (int i = 0; i < trianglesCount; ++i) {
-			WaterShoreSegment shoreSegment = segmentList [i];
+			TriangleShape waterTriangle = triangleList [i];
 
-			vertices [trianglesIndex * 3 + 0] = shoreSegment.posOne - worldPos;
-			vertices [trianglesIndex * 3 + 1] = shoreSegment.posTwo - worldPos;
-			vertices [trianglesIndex * 3 + 2] = centerPos;
+			vertices [trianglesIndex * 3 + 0] = waterTriangle.PosArray [0];
+			vertices [trianglesIndex * 3 + 1] = waterTriangle.PosArray [1];
+			vertices [trianglesIndex * 3 + 2] = waterTriangle.PosArray [2];
 
 			colors [trianglesIndex * 3 + 0] = Color.white;
 			colors [trianglesIndex * 3 + 1] = Color.white;
 			colors [trianglesIndex * 3 + 2] = Color.white;
 
-			triangles [trianglesIndex * 3 + 0] = trianglesIndex * 3 + 2;
+			triangles [trianglesIndex * 3 + 0] = trianglesIndex * 3 + 0;
 			triangles [trianglesIndex * 3 + 1] = trianglesIndex * 3 + 1;
-			triangles [trianglesIndex * 3 + 2] = trianglesIndex * 3 + 0;
+			triangles [trianglesIndex * 3 + 2] = trianglesIndex * 3 + 2;
 			trianglesIndex++;
 		}
 
+		Vector4 rangeSize = Utils.GetRangeSize (triangleList);
 		for (int i = 0; i < uv.Length; ++i) {
-			uv [i] = GetUV (xMin, xMax, zMin, zMax, vertices [i]);
+			uv [i] = GetUV (rangeSize.x, rangeSize.y, rangeSize.z, rangeSize.w, vertices [i]);
 		}
 
 		retMesh.vertices = vertices;
@@ -188,10 +133,57 @@ public class Water{
 		return retMesh;
 	}
 
+	#region 生成环的水的第二版方法
+	Mesh CreateRingWaterMesh()
+	{
+		List<Vector3> insidePoints = mInsideShore.GetAllShorePoint ();
+		List<Vector3> outsidePoints = mOutsideShore.GetAllShorePoint ();
+
+		List<TriangleShape> generateTriangles = new List<TriangleShape> ();
+
+		List<Vector3> cullPointList1 = new List<Vector3> ();
+		List<Vector3> cullPointList2 = new List<Vector3> ();
+
+		for (int i = 0; i < insidePoints.Count; i++) {
+			Vector3 curInsidePoint = insidePoints [i];
+			int nextInsideIndex = Utils.GetRingNextIndex (i, insidePoints.Count, false);
+			Vector3 nextInsidePoint = insidePoints[nextInsideIndex];
+			bool hasFind = false;
+			for (int j = 0; j < outsidePoints.Count; ++j) {
+				Vector3 curOutSidePoint = outsidePoints [j];
+				int nextOutsideIndex = Utils.GetRingNextIndex (j, outsidePoints.Count, false);
+				Vector3 nextOutSidePoint = outsidePoints[nextOutsideIndex];
+				if (mInsideShore.IsLineIntersection (curInsidePoint, curOutSidePoint))
+					continue;
+				if (mInsideShore.IsLineIntersection (nextInsidePoint, nextOutSidePoint))
+					continue;
+				if (mOutsideShore.IsLineIntersection (curInsidePoint, curOutSidePoint))
+					continue;
+				if (mOutsideShore.IsLineIntersection (nextInsidePoint, nextOutSidePoint))
+					continue;
+
+				//把这四个点单独生成一个多边形
+				cullPointList1.Add (curInsidePoint);
+				cullPointList1.Add (curOutSidePoint);
+				cullPointList1.Add (nextOutSidePoint);
+				cullPointList1.Add (nextInsidePoint);
+
+				//把剩余所有的点单独生成多边形
+				Utils.CopyList (outsidePoints, cullPointList2, nextOutsideIndex, false);
+				Utils.CopyList (insidePoints, cullPointList2, i, true);
+				hasFind = true;
+				break;
+			}
+			if (hasFind)
+				break;
+		}
+		generateTriangles.AddRange (Utils.GenerateTriangles (cullPointList1));
+		generateTriangles.AddRange (Utils.GenerateTriangles (cullPointList2));
+		return CreateMeshWithTrianglesList(generateTriangles);
+	}
 	#endregion
 
-	#region 生成环状的水
-
+	#region 生成环状的水的第一版方法
 	void GeneralRingWaterTriangles()
 	{
 		List<Vector3> insidePoints = mInsideShore.GetAllShorePoint ();
@@ -247,7 +239,7 @@ public class Water{
 					canInOutOutTriangles = false;
 
 				if (canInOutOutTriangles) {
-					TriangleObject triangleObj = new TriangleObject (insidePoint, outsideNextPoint, outsidePoint);
+					TriangleShape triangleObj = new TriangleShape (insidePoint, outsideNextPoint, outsidePoint);
 					mAllTriangles.Add (triangleObj);
 					sbLog.Append (triangleObj.ToString () + "\n");
 				}
@@ -265,7 +257,7 @@ public class Water{
 
 
 				if (canInInOutTriangles) {
-					TriangleObject triangleObj = new TriangleObject (insideNextPoint, insidePoint, outsidePoint);
+					TriangleShape triangleObj = new TriangleShape (insideNextPoint, insidePoint, outsidePoint);
 					mAllTriangles.Add (triangleObj);
 					sbLog.Append (triangleObj.ToString () + "\n");
 				}
@@ -294,9 +286,9 @@ public class Water{
 
 			var triangleInfo = mAllTriangles [i];
 
-			vertices [trianglesIndex * 3 + 0] = triangleInfo.pos1;
-			vertices [trianglesIndex * 3 + 1] = triangleInfo.pos2;
-			vertices [trianglesIndex * 3 + 2] = triangleInfo.pos3;
+			vertices [trianglesIndex * 3 + 0] = triangleInfo.PosArray [0];
+			vertices [trianglesIndex * 3 + 1] = triangleInfo.PosArray [1];
+			vertices [trianglesIndex * 3 + 2] = triangleInfo.PosArray [2];
 
 			colors [trianglesIndex * 3 + 0] = Color.white;
 			colors [trianglesIndex * 3 + 1] = Color.white;
@@ -307,10 +299,10 @@ public class Water{
 			triangles [trianglesIndex * 3 + 2] = trianglesIndex * 3 + 2;
 			trianglesIndex++;
 
-			xMin = Utils.GetMinValue (xMin, triangleInfo.pos1.x, triangleInfo.pos2.x, triangleInfo.pos3.x);
-			xMax = Utils.GetMaxValue (xMax, triangleInfo.pos1.x, triangleInfo.pos2.x, triangleInfo.pos3.x);
-			zMin = Utils.GetMinValue (zMin, triangleInfo.pos1.z, triangleInfo.pos2.z, triangleInfo.pos3.z);
-			zMax = Utils.GetMaxValue (zMax, triangleInfo.pos1.z, triangleInfo.pos2.z, triangleInfo.pos3.z);
+			xMin = Utils.GetMinValue (xMin, triangleInfo.PosArray [0].x, triangleInfo.PosArray [1].x, triangleInfo.PosArray [2].x);
+			xMax = Utils.GetMaxValue (xMax, triangleInfo.PosArray [0].x, triangleInfo.PosArray [1].x, triangleInfo.PosArray [2].x);
+			zMin = Utils.GetMinValue (zMin, triangleInfo.PosArray [0].z, triangleInfo.PosArray [1].z, triangleInfo.PosArray [2].z);
+			zMax = Utils.GetMaxValue (zMax, triangleInfo.PosArray [0].z, triangleInfo.PosArray [1].z, triangleInfo.PosArray [2].z);
 		}
 
 		for (int i = 0; i < uv.Length; ++i) {

@@ -174,4 +174,20 @@ public class WaterBuilder : MonoBehaviour {
 			}
 		}
 	}
+
+	void TestData()
+	{
+		List<Vector3> pointList = new List<Vector3> ();
+		pointList.Add(new Vector3(0f, 0f, 0f));
+//		pointList.Add(new Vector3(0f, 0f, 10f));
+//		pointList.Add(new Vector3(0f, 0f, 20f));
+		pointList.Add(new Vector3(0f, 0f, 30f));
+		pointList.Add(new Vector3(20f, 0f, 30f));
+		pointList.Add(new Vector3(10f, 0f, 10f));
+		pointList.Add(new Vector3(30f, 0f, 10f));
+		pointList.Add(new Vector3(30f, 0f, 0f));
+//		pointList.Add(new Vector3(20f, 0f, 0f));
+//		pointList.Add(new Vector3(10f, 0f, 0f));
+		Utils.GenerateTriangles (pointList);
+	}
 }
