@@ -18,6 +18,9 @@ public class WaterBuilder : MonoBehaviour {
 
 	public void BuildWater()
 	{
+//
+//		TestData ();
+//		return;
 		terrainParse = gameObject.GetComponent<WaterTerrainParse> ();
 
 		List<WaterShoreSegment> waterShoreSegment = terrainParse.GenerateWaterShoreSegmentList (waterHeight);
@@ -178,16 +181,88 @@ public class WaterBuilder : MonoBehaviour {
 	void TestData()
 	{
 		List<Vector3> pointList = new List<Vector3> ();
-		pointList.Add(new Vector3(0f, 0f, 0f));
-//		pointList.Add(new Vector3(0f, 0f, 10f));
-//		pointList.Add(new Vector3(0f, 0f, 20f));
-		pointList.Add(new Vector3(0f, 0f, 30f));
-		pointList.Add(new Vector3(20f, 0f, 30f));
-		pointList.Add(new Vector3(10f, 0f, 10f));
-		pointList.Add(new Vector3(30f, 0f, 10f));
-		pointList.Add(new Vector3(30f, 0f, 0f));
-//		pointList.Add(new Vector3(20f, 0f, 0f));
-//		pointList.Add(new Vector3(10f, 0f, 0f));
-		Utils.GenerateTriangles (pointList);
+//		pointList.Add(new Vector3(0f, 0f, 0f));
+//		pointList.Add(new Vector3(0f, 0f, 30f));
+//		pointList.Add(new Vector3(20f, 0f, 30f));
+//		pointList.Add(new Vector3(10f, 0f, 10f));
+//		pointList.Add(new Vector3(30f, 0f, 10f));
+//		pointList.Add(new Vector3(30f, 0f, 0f));
+//		pointList.Reverse ();
+
+		pointList.Add(new Vector3(40f, 0f, 40f));
+		pointList.Add(new Vector3(40f, 0f, 50f));
+		pointList.Add(new Vector3(10f, 0f, 50f));
+		pointList.Add(new Vector3(10f, 0f, 20f));
+		pointList.Add(new Vector3(20f, 0f, 10f));
+		pointList.Add(new Vector3(60f, 0f, 10f));
+		pointList.Add(new Vector3(60f, 0f, 50f));
+		pointList.Add(new Vector3(40f, 0f, 50f));
+		pointList.Add(new Vector3(40f, 0f, 40f));
+		pointList.Add(new Vector3(50f, 0f, 40f));
+		pointList.Add(new Vector3(50f, 0f, 20f));
+		pointList.Add(new Vector3(20f, 0f, 20f));
+		pointList.Add(new Vector3(20f, 0f, 40f));
+
+
+		List<TriangleShape> triangleList = Utils.GenerateTriangles (pointList);
+
+		Mesh mesh = TestCreateMesh (triangleList);
+		if (null == mesh)
+			return;
+		GameObject child = new GameObject ();
+		child.transform.SetParent (this.transform);
+		child.transform.localPosition = Vector3.zero;
+		MeshFilter filter = child.AddComponent<MeshFilter> ();
+		MeshRenderer render = child.AddComponent<MeshRenderer> ();
+		render.material = Resources.Load<Material> ("Material/WaterMaterial1");
+		filter.mesh = mesh;
+	}
+
+	Mesh TestCreateMesh(List<TriangleShape> triangleList)
+	{
+		Mesh retMesh = new Mesh ();
+		int trianglesCount = triangleList.Count;
+		Vector3[] vertices = new Vector3[trianglesCount * 3];
+		Vector2[] uv = new Vector2[trianglesCount * 3];
+		Color[] colors = new Color[trianglesCount * 3];
+		int[] triangles = new int[trianglesCount * 3];
+
+		int trianglesIndex = 0;
+		for (int i = 0; i < trianglesCount; ++i) {
+			TriangleShape waterTriangle = triangleList [i];
+
+			vertices [trianglesIndex * 3 + 0] = waterTriangle.PosArray [0];
+			vertices [trianglesIndex * 3 + 1] = waterTriangle.PosArray [1];
+			vertices [trianglesIndex * 3 + 2] = waterTriangle.PosArray [2];
+
+			colors [trianglesIndex * 3 + 0] = Color.white;
+			colors [trianglesIndex * 3 + 1] = Color.white;
+			colors [trianglesIndex * 3 + 2] = Color.white;
+
+			triangles [trianglesIndex * 3 + 0] = trianglesIndex * 3 + 0;
+			triangles [trianglesIndex * 3 + 1] = trianglesIndex * 3 + 1;
+			triangles [trianglesIndex * 3 + 2] = trianglesIndex * 3 + 2;
+			trianglesIndex++;
+		}
+
+		Vector4 rangeSize = Utils.GetRangeSize (triangleList);
+		for (int i = 0; i < uv.Length; ++i) {
+			uv [i] = GetUV (rangeSize.x, rangeSize.y, rangeSize.z, rangeSize.w, vertices [i]);
+		}
+
+		retMesh.vertices = vertices;
+		retMesh.uv = uv;
+		retMesh.colors = colors;
+		retMesh.triangles = triangles;
+
+		return retMesh;
+	}
+
+	Vector2 GetUV(float xMin, float xMax, float yMin, float yMax, Vector3 pos)
+	{
+		Vector2 ret;
+		ret.x = (pos.x - xMin) / (xMax - xMin);
+		ret.y = (pos.z - yMin) / (yMax - yMin);
+		return ret;
 	}
 }

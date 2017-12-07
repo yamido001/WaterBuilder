@@ -32,8 +32,8 @@
 
 			struct v2f
 			{
+				float4 objectPos : TEXCOORD2;
 				float2 bumpuv[2] : TEXCOORD0;
-				float3 viewDir : TEXCOORD2;
 				UNITY_FOG_COORDS(1)
 				float4 vertex : SV_POSITION;
 			};
@@ -52,7 +52,7 @@
 				float4 temp = (worldPos.xzxz + _WaveSpeed * _Time.x) * _WaveScale;
 				o.bumpuv[0] = temp.xy;
 				o.bumpuv[1] = temp.wz;
-				o.viewDir = normalize(WorldSpaceViewDir(v.vertex)).xyz;
+				o.objectPos = v.vertex;
 				UNITY_TRANSFER_FOG(o,o.vertex);
 				return o;
 			}
@@ -63,7 +63,7 @@
 				half3 bump2 = UnpackNormal(tex2D(_BumpMap, i.bumpuv[1])).rgb;
 				half3 bump = (bump1 + bump2) * 0.5;
 				//bump是切换空间下的法线方向，z轴对应的是物体空间中的上方(y轴)，这里为了节省运算计算，因为水的y轴在世界空间是一定向上的，这里直接调换法线的z和y
-				half fresnel = dot(i.viewDir, bump.xzy);
+				half fresnel = dot(normalize(UnityWorldSpaceViewDir(i.objectPos)).xyz, bump.xzy);
 
 				half4 water = tex2D(_ColorControl, float2(fresnel, fresnel));
 

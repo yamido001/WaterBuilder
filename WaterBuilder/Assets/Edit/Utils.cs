@@ -114,61 +114,221 @@ public class Utils{
 		return Vector3.Lerp (line2Pos1, line2Pos2, percent / 1 + percent);
 	}
 
+//	public static List<TriangleShape> GenerateTriangles(List<Vector3> posList)
+//	{
+//		List<TriangleShape> retList = new List<TriangleShape> ();
+//		List<Vector3> pointList = new List<Vector3> ();
+//		pointList.AddRange (posList);
+//
+//		HashSet<int> aoPointList = new HashSet<int>();
+//		int[] findPointIndexArray = new int[3];
+//
+//		while (true) {
+//			aoPointList.Clear ();
+//			//这个Cross判断的方法需要pointList是逆时针存在的，但是现在哪一步保证了pointList是逆时针的，不清楚
+//			for (int i = 0; i < pointList.Count; ++i) {
+//				Vector3 curPoint = pointList [i];
+//				Vector3 nextPoint = pointList[GetRingNextIndex(i, pointList.Count, false)];
+//				Vector3 prePoint = pointList[GetRingNextIndex(i, pointList.Count, true)];
+//
+//				Vector3 crossDir = Vector3.Cross (nextPoint - curPoint, curPoint - prePoint);
+//				if (crossDir.y < 0) {
+//					aoPointList.Add (i);
+//				}
+//			}
+//
+//			if (aoPointList.Count == 0)
+//				break;
+//
+//			findPointIndexArray [0] = -1;
+//			//找到当前是凹点，并且下一个点不为凹点
+//			foreach(int curIndex in aoPointList)
+//			{
+//				findPointIndexArray [1] = GetRingNextIndex(curIndex, pointList.Count, false);
+//				findPointIndexArray [2] = GetRingNextIndex(findPointIndexArray [1] , pointList.Count, false);
+//				if(!aoPointList.Contains(findPointIndexArray [1])){
+//					findPointIndexArray [0] = curIndex;
+//					break;
+//				}
+//			}
+//			if(findPointIndexArray [0] < 0)
+//			{
+//				Debug.LogError("没有找到合适的切割点");
+//				return null;
+//			}
+//
+//			TriangleShape triangleShape = new TriangleShape (pointList [findPointIndexArray [0]], pointList [findPointIndexArray [1]], pointList [findPointIndexArray [2]]);
+//			retList.Add (triangleShape);
+//			pointList.RemoveAt (findPointIndexArray[1]);
+//			SimplifyPolygon (pointList);
+//		}
+//
+//		return DivisionConvexPolygonToTriangle (pointList);
+//	}
+
+
+	/// <summary>
+	/// 把多边形拆分成多个三角形
+	/// 通过先把凹多边形拆分成多个凸多边形,然后每一个凸多边形再拆分成三角形
+	/// </summary>
+	/// <returns>The triangles.</returns>
+	/// <param name="posList">Position list.</param>
 	public static List<TriangleShape> GenerateTriangles(List<Vector3> posList)
 	{
-		List<TriangleShape> retList = new List<TriangleShape> ();
-		List<Vector3> pointList = new List<Vector3> ();
-		pointList.AddRange (posList);
+		List<TriangleShape> triangleList = new List<TriangleShape> ();
+		List<List<Vector3>> convexPolygonList = new List<List<Vector3>> ();
+		DivisionPolygonConcaveToConvex (posList, convexPolygonList);
+		for (int i = 0; i < convexPolygonList.Count; ++i) {
+			triangleList.AddRange (DivisionConvexPolygonToTriangle (convexPolygonList[i]));
+		}
+		return triangleList;
+	}
 
-		HashSet<int> aoPointList = new HashSet<int>();
-		int[] findPointIndexArray = new int[3];
+	static bool IsLineIntersectionPolygon(List<Vector3> polygonPointList, Vector3 point1, Vector3 point2)
+	{
+		for (int i = 0; i < polygonPointList.Count; ++i) {
+			Vector3 curPoint = polygonPointList [i];
+			Vector3 nextPoint = polygonPointList[GetRingNextIndex(i, polygonPointList.Count, false)];
+			if (IsLineIntersection (curPoint, nextPoint, point1, point2))
+				return true;
+		}
+		return false;
+	}
 
-		while (true) {
-			aoPointList.Clear ();
-			//这个Cross判断的方法需要pointList是逆时针存在的，但是现在哪一步保证了pointList是逆时针的，不清楚
-			for (int i = 0; i < pointList.Count; ++i) {
-				Vector3 curPoint = pointList [i];
-				Vector3 nextPoint = pointList[GetRingNextIndex(i, pointList.Count, false)];
-				Vector3 prePoint = pointList[GetRingNextIndex(i, pointList.Count, true)];
 
-				Vector3 crossDir = Vector3.Cross (nextPoint - curPoint, curPoint - prePoint);
-				if (crossDir.y < 0) {
-					aoPointList.Add (i);
-				}
+	/// <summary>
+	/// 确保多边形的点是逆时针的
+	/// </summary>
+	/// <param name="pointList">Point list.</param>
+	public static void MakePolygonAnticlockwise(List<Vector3> pointList)
+	{
+		int xMaxPointIndex = -1;
+		float curX = float.MinValue;
+		for (int i = 0; i < pointList.Count; ++i) {
+			if (pointList [i].x > curX) {
+				xMaxPointIndex = i;
+				curX = pointList [i].x;
 			}
-
-			if (aoPointList.Count == 0)
-				break;
-
-			findPointIndexArray [0] = -1;
-			//找到当前是凹点，并且下一个点不为凹点
-			foreach(int curIndex in aoPointList)
-			{
-				findPointIndexArray [1] = GetRingNextIndex(curIndex, pointList.Count, false);
-				findPointIndexArray [2] = GetRingNextIndex(findPointIndexArray [1] , pointList.Count, false);
-				if(!aoPointList.Contains(findPointIndexArray [1])){
-					findPointIndexArray [0] = curIndex;
-					break;
-				}
-			}
-			if(findPointIndexArray [0] < 0)
-			{
-				Debug.LogError("没有找到合适的切割点");
-				return null;
-			}
-
-			TriangleShape triangleShape = new TriangleShape (pointList [findPointIndexArray [0]], pointList [findPointIndexArray [1]], pointList [findPointIndexArray [2]]);
-			retList.Add (triangleShape);
-			pointList.RemoveAt (findPointIndexArray[1]);
 		}
 
-		//分割完毕后，再把凸多边形分割成三角形
-		Vector3 centerPos = GetCenterPos(pointList);
+		int preIndex = GetRingNextIndex (xMaxPointIndex, pointList.Count, true);
+		int nextIndex = GetRingNextIndex (xMaxPointIndex, pointList.Count, false);
+		Vector3 cross = Vector3.Cross (pointList[xMaxPointIndex] - pointList[preIndex], pointList[nextIndex] - pointList[xMaxPointIndex]);
+		if (cross.y > 0) {
+			pointList.Reverse ();
+		}
+	}
+
+	public static void SimplifyPolygon(List<Vector3> pointList)
+	{
+		for (int i = pointList.Count - 1; i >= 0; --i) {
+			if (pointList.Count < 3)
+				return;
+			int nextIndex = GetRingNextIndex (i, pointList.Count, false);
+			int preIndex = GetRingNextIndex (i, pointList.Count, true);
+
+			Vector3 curPoint = pointList [i];
+			Vector3 prePoint = pointList[preIndex];
+			Vector3 nextPoint = pointList[nextIndex];
+			Vector3 cross = Vector3.Cross (curPoint - prePoint, nextPoint - curPoint);
+			if (Mathf.Abs(cross.sqrMagnitude) <= 0.001f) {
+				//共线
+				pointList.RemoveAt(i);
+			}
+		}
+	}
+
+	/// <summary>
+	/// 把凹多边形分割成多个凸多边形
+	/// </summary>
+	/// <returns>The concave polygon.</returns>
+	/// <param name="inputPointList">Input point list.</param>
+	public static void DivisionPolygonConcaveToConvex(List<Vector3> inputPointList, List<List<Vector3>> finallyPolygonList)
+	{
+		//不改变输入数据
+		List<Vector3> pointList = new List<Vector3> ();
+		pointList.AddRange (inputPointList);
+
+		if (pointList.Count == 3) {
+			finallyPolygonList.Add (pointList);
+			return;
+		}
+
+		int aoIndex = -1;
+		Vector3 comparyDir = Vector3.zero;
 		for (int i = 0; i < pointList.Count; ++i) {
 			Vector3 curPoint = pointList [i];
 			Vector3 nextPoint = pointList[GetRingNextIndex(i, pointList.Count, false)];
-			TriangleShape triangleShape = new TriangleShape (curPoint, centerPos, nextPoint);
+			Vector3 prePoint = pointList[GetRingNextIndex(i, pointList.Count, true)];
+
+			Vector3 crossDir = Vector3.Cross (nextPoint - curPoint, curPoint - prePoint);
+			if (crossDir.y < 0) {
+				aoIndex = i;
+				comparyDir = -((nextPoint - curPoint).normalized + (prePoint - curPoint).normalized);
+				break;
+			}
+		}
+
+		//当前已经是凸多边形了
+		if (aoIndex < 0) {
+			finallyPolygonList.Add (pointList);
+			return;
+		}
+
+		//从凹点处的角分线的反方向找到不和多边形相交并且角度最近的点，用这两个点来切割凹多边形
+		comparyDir.Normalize();
+		int otherCullPointIndex = -1;
+		float curCosValue = 0f;
+		for (int i = 0; i < pointList.Count; ++i) {
+			if (Mathf.Abs (i - aoIndex) <= 1 || Mathf.Abs(i - aoIndex) >= pointList.Count - 1)
+				continue;
+			Vector3 checkPoint = pointList [i];
+			if (IsLineIntersectionPolygon (pointList, checkPoint, pointList [aoIndex]))
+				continue;
+			float checkCosValue = Vector3.Dot (comparyDir, (checkPoint - pointList [aoIndex]).normalized);
+			if (checkCosValue > curCosValue) {
+				otherCullPointIndex = i;
+				curCosValue = checkCosValue;
+			}
+		}
+
+		if (otherCullPointIndex < 0) {
+			Debug.LogError ("居然没有为凹点找到合适的分割点 " + pointList.Count);
+			return;
+		}
+
+		List<Vector3> newPointList = new List<Vector3> ();
+		CopyList (pointList, newPointList, aoIndex, otherCullPointIndex);
+		RemoveFromList (pointList, GetRingNextIndex(aoIndex, pointList.Count, false), GetRingNextIndex(otherCullPointIndex, pointList.Count, true));
+
+		SimplifyPolygon (pointList);
+		SimplifyPolygon (newPointList);
+
+		DivisionPolygonConcaveToConvex (pointList, finallyPolygonList);
+		DivisionPolygonConcaveToConvex (newPointList, finallyPolygonList);
+		return;
+	}
+
+	/// <summary>
+	/// 把凸多边形分割成多个三角形
+	/// </summary>
+	/// <returns>The convex polygon to triangle.</returns>
+	/// <param name="pointList">Point list.</param>
+	public static List<TriangleShape> DivisionConvexPolygonToTriangle(List<Vector3> pointList)
+	{
+		List<TriangleShape> retList = new List<TriangleShape> ();
+
+		if (pointList.Count == 3) {
+			TriangleShape triangleShape = new TriangleShape (pointList[0], pointList[1], pointList[2]);
 			retList.Add (triangleShape);
+		} else {
+			Vector3 centerPos = GetCenterPos(pointList);
+			for (int i = 0; i < pointList.Count; ++i) {
+				Vector3 curPoint = pointList [i];
+				Vector3 nextPoint = pointList[GetRingNextIndex(i, pointList.Count, false)];
+				TriangleShape triangleShape = new TriangleShape (curPoint, centerPos, nextPoint);
+				retList.Add (triangleShape);
+			}
 		}
 		return retList;
 	}
@@ -206,6 +366,29 @@ public class Utils{
 			copyCount++;
 			dstList.Add (srcList [beginIndex]);
 			beginIndex = GetRingNextIndex (beginIndex, srcList.Count, isRevert);
+		}
+	}
+
+	public static void CopyList(List<Vector3> srcList, List<Vector3> dstList, int beginIndex, int endIndex)
+	{
+		int copyCount = 0;
+		int copyMaxCount = endIndex > beginIndex ? endIndex - beginIndex + 1 : srcList.Count - (beginIndex - endIndex - 1);
+		while (copyCount < copyMaxCount) {
+			copyCount++;
+			dstList.Add (srcList [beginIndex]);
+			beginIndex = GetRingNextIndex (beginIndex, srcList.Count, false);
+		}
+	}
+
+	public static void RemoveFromList(List<Vector3> srcList, int beginIndex, int endIndex)
+	{
+		if (beginIndex == endIndex) {
+			srcList.RemoveAt (beginIndex);
+		} else if (endIndex > beginIndex) {
+			srcList.RemoveRange (beginIndex, endIndex - beginIndex + 1);
+		} else {
+			srcList.RemoveRange (beginIndex, srcList.Count - beginIndex);
+			srcList.RemoveRange (0, endIndex + 1);
 		}
 	}
 }

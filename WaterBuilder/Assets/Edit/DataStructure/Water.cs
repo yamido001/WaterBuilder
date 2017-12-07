@@ -97,6 +97,7 @@ public class Water{
 	{
 		Mesh retMesh = new Mesh ();
 		int trianglesCount = triangleList.Count;
+		Vector4[] tangents = new Vector4[trianglesCount * 3];
 		Vector3[] vertices = new Vector3[trianglesCount * 3];
 		Vector2[] uv = new Vector2[trianglesCount * 3];
 		Color[] colors = new Color[trianglesCount * 3];
@@ -129,6 +130,23 @@ public class Water{
 		retMesh.uv = uv;
 		retMesh.colors = colors;
 		retMesh.triangles = triangles;
+
+		for (int i = 0; i < tangents.Length; ++i) {
+			tangents [i] = new Vector4 (1f, 0f, 0f, 1f);
+		}
+		retMesh.tangents = tangents;
+
+//		System.Text.StringBuilder sbLog = new System.Text.StringBuilder ();
+//		for (int i = 0; i < retMesh.tangents.Length; ++i) {
+//			sbLog.Append (retMesh.tangents[i].ToString() + "\n");
+//		}
+//		Debug.LogError ("切线信息是: \n" + sbLog.ToString());
+//
+//		System.Text.StringBuilder sbNormalLog = new System.Text.StringBuilder ();
+//		for (int i = 0; i < retMesh.normals.Length; ++i) {
+//			sbNormalLog.Append (retMesh.normals[i].ToString() + "\n");
+//		}
+//		Debug.LogError ("法线信息是: \n" + sbNormalLog.ToString());
 
 		return retMesh;
 	}
