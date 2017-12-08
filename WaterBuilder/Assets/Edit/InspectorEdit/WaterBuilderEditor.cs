@@ -23,7 +23,7 @@ public class WaterBuilderEditor : Editor {
 	public override void OnInspectorGUI ()
 	{
 		serializedObject.Update ();
-		EditorGUILayout.PropertyField (waterHeight, new GUIContent ("Water 试试  Height"));
+		EditorGUILayout.PropertyField (waterHeight, new GUIContent ("Water Height"));
 		EditorGUILayout.Space ();
 
 		mAutoRebuild = EditorGUILayout.Toggle("Auto build water", mAutoRebuild);

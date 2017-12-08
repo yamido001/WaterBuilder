@@ -154,6 +154,7 @@ public class WaterBuilder : MonoBehaviour {
 
 	void OnDrawGizmos()
 	{
+		return;
 		//画所有的串联起来的边界线
 		Color[] allColors = new Color[5];
 		allColors [0] = Color.yellow;
